@@ -7,7 +7,7 @@ defmodule MiniRepo.Endpoint do
 
   plug Plug.Static,
     at: "/repos",
-    from: {:mini_repo, "data/repos"}
+    from: "data/repos"
 
   plug MiniRepo.APIAuth
   plug MiniRepo.APIRouter, builder_opts()

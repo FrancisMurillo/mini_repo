@@ -1,0 +1,36 @@
+version: '3.1'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - ./cache:/opt/app/data
+    networks:
+      default:
+      hexpm:
+        aliases:
+          - hexpm_mirror
+    environment:
+      PORT: "4000"
+      PACKAGES: >
+        cowboy
+        cowboy_telemetry
+        cowlib
+        decimal
+        jason
+        mime
+        phoenix
+        phoenix_html
+        phoenix_pubsub
+        plug
+        plug_cowboy
+        plug_crypto
+        ranch
+        telemetry
+        telemetry_metrics
+        telemetry_poller
+networks:
+  hexpm:
+    external: true

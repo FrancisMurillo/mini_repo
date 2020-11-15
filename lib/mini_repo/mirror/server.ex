@@ -51,9 +51,10 @@ defmodule MiniRepo.Mirror.Server do
 
     with {:ok, names} when is_list(names) <- sync_names(mirror, config),
          {:ok, versions} when is_list(versions) <- sync_versions(mirror, config) do
-      versions =
-        for %{name: name} = map <- versions,
-            !mirror.only or name in mirror.only,
+      only_packages = Enum.map(mirror.only, &elem(&1, 0))
+
+      versions = for %{name: name} = map <- versions,
+            !mirror.only or name in only_packages,
             into: %{},
             do: {name, Map.delete(map, :version)}
 
@@ -79,12 +80,20 @@ defmodule MiniRepo.Mirror.Server do
   defp sync_created_packages(mirror, config, diff) do
     mirror_sync_opts = Keyword.merge(@default_sync_opts, mirror.sync_opts)
 
+    only_map = Enum.into(mirror.only, %{})
+
     stream =
       Task.Supervisor.async_stream_nolink(
         MiniRepo.TaskSupervisor,
         diff.packages.created,
         fn name ->
           {:ok, releases} = sync_package(mirror, config, name)
+
+          releases = if pin_version = Map.get(only_map, name, nil) do
+            Enum.filter(releases, fn release -> release.version == pin_version end)
+          else
+            releases
+          end
 
           stream =
             Task.Supervisor.async_stream_nolink(
@@ -121,12 +130,22 @@ defmodule MiniRepo.Mirror.Server do
   defp sync_releases(mirror, config, diff) do
     mirror_sync_opts = Keyword.merge(@default_sync_opts, mirror.sync_opts)
 
+    only_map = Enum.into(mirror.only, %{})
+
     stream =
       Task.Supervisor.async_stream_nolink(
         MiniRepo.TaskSupervisor,
         diff.releases,
         fn {name, map} ->
-          {:ok, releases} = sync_package(mirror, config, name)
+          {:ok, _releases} = sync_package(mirror, config, name)
+
+          releases = if pin_version = Map.get(only_map, name, nil) do
+            Enum.filter(map.created, fn release -> release == pin_version end)
+          else
+            map.created
+          end
+
+          map = %{map | created: releases}
 
           Task.Supervisor.async_stream_nolink(
             MiniRepo.TaskSupervisor,

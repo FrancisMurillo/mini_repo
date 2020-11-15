@@ -4,29 +4,31 @@ config :mini_repo,
   port: 4000,
   url: "http://localhost:4000"
 
-store = {MiniRepo.Store.Local, root: {:mini_repo, "data"}}
+packages = System.get_env("PACKAGES", "")
+|> String.trim()
+|> String.split(" ", trim: true)
+|> Enum.map(fn package ->
+  case String.split(package, "-", trim: true, parts: 2) do
+    [package, version] ->
+      {package, version}
+    [package | _] ->
+      {package, nil}
+    [] ->
+      nil
+  end
+end)
+|> Enum.reject(&is_nil/1)
 
 config :mini_repo,
-  auth_token: "secret",
+  auth_token: nil,
   repositories: [
-    test_repo: [
-      private_key: File.read!(Path.expand("../priv/test_repo_private.pem", __DIR__)),
-      public_key: File.read!(Path.expand("../priv/test_repo_public.pem", __DIR__)),
-      store: store
-    ],
     hexpm_mirror: [
-      store: store,
+      store: {MiniRepo.Store.Local, root: "data"},
       upstream_name: "hexpm",
       upstream_url: "https://repo.hex.pm",
-
-      # only mirror following packages
-      only: ~w(decimal),
-
-      # 5min
-      sync_interval: 5 * 60 * 1000,
-      sync_opts: [max_concurrency: 1],
-
-      # https://hex.pm/docs/public_keys
+      only: packages,
+      sync_interval: :timer.hours(24),
+      sync_opts: [timeout: :infinity],
       upstream_public_key: """
       -----BEGIN PUBLIC KEY-----
       MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApqREcFDt5vV21JVe2QNB
